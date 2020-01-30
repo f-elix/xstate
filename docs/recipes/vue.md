@@ -2,11 +2,33 @@
 
 Vue follows a similar pattern to [React](./react.md):
 
-- The machine can be defined externally
-- The service is placed on the `data` object
-- State changes are observed via `service.onTransition(state => ...)`, where you set some data property to the next `state`
-- The service is started (`service.start()`) when the component is `created()`
+- The machine can be defined externally;
+- The service is placed on the `data` object;
+- State changes are observed via `service.onTransition(state => ...)`, where you set some data property to the next `state`;
+- The machine's context can be referenced as an external data store by the app. Context changes can also be observed via `service.onTransition(state => ...)`, where you set another data property to the updated context;
+- The service is started (`service.start()`) when the component is `created()`;
 - Events are sent to the service via `service.send(event)`.
+
+```js
+import { Machine, interpret } from 'xstate';
+
+// This machine is completely decoupled from Vue
+export const toggleMachine = Machine({
+  id: 'toggle',
+  context: {
+    /* some data */
+  },
+  initial: 'inactive',
+  states: {
+    inactive: {
+      on: { TOGGLE: 'active' }
+    },
+    active: {
+      on: { TOGGLE: 'inactive' }
+    }
+  }
+});
+```
 
 ```html
 <!-- Toggle.vue -->
@@ -17,21 +39,8 @@ Vue follows a similar pattern to [React](./react.md):
 </template>
 
 <script>
-  import { Machine, interpret } from 'xstate';
-
-  // Define machine externally
-  const toggleMachine = Machine({
-    id: 'toggle',
-    initial: 'inactive',
-    states: {
-      inactive: {
-        on: { TOGGLE: 'active' }
-      },
-      active: {
-        on: { TOGGLE: 'inactive' }
-      }
-    }
-  });
+  import { interpret } from 'xstate';
+  import { toggleMachine } from '../path/to/toggleMachine';
 
   export default {
     name: 'Toggle',
@@ -39,7 +48,10 @@ Vue follows a similar pattern to [React](./react.md):
       // Start service on component creation
       this.toggleService
         .onTransition(state => {
+          // Update the component data property that holds the current state with the new state
           this.current = state;
+          // Update the component data property that holds the context with the updated context
+          this.context = state.context;
         })
         .start();
     },
@@ -49,7 +61,10 @@ Vue follows a similar pattern to [React](./react.md):
         toggleService: interpret(toggleMachine),
 
         // Start with machine's initial state
-        current: toggleMachine.initialState
+        current: toggleMachine.initialState,
+  
+        // Start with the machine's initial context
+        context: toggleMachine.context
       };
     },
     methods: {
